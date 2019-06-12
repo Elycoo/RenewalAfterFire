@@ -35,9 +35,10 @@ E = [0.1622    0.6020    0.4505    0.8258    0.1067;
 % E reresent the probabilty of each point in matrix to extinction.
 Size = 20;
 rng('default');
+rand(Size);
 A = rand(Size);
 B = rand(Size);
-E = rand(Size);
+E = 0*rand(Size);
 
 % A = 3*ones(Size);
 
@@ -51,6 +52,13 @@ E = E./S;
 S = cat(3,B,E,A);
 [~,f] = max(S,[],3);
 f = f-2;
+
+% Save initial condtion
+A = f==1;
+B = f==-1;
+
+all_f = zeros(Size,Size,81,'int8');
+all_f(:,:,1) = f;
 
 figure;
 imagesc(f)
@@ -80,11 +88,11 @@ ab2 = 0;
 ba1 = 1;
 ba2 = 0;
 
-ae = 10;
-be = 10;
+ae = 1;
+be = 1;
 
-ea = 1;
-eb = 1;
+ea = -1;
+eb = -1;
 
 % A-A and B-B interaction
 Haa = @(x) -aa*x.*(x-n);
@@ -102,8 +110,8 @@ Hae = @(x) ae*x;
 Hbe = @(x) be*x;
 
 % E-A and B-E interaction. How E effected from A/B that around
-Hea = @(x) -ea*x;
-Heb = @(x) -ea*x;
+Hea = @(x) ea*x;
+Heb = @(x) ea*x;
 
 Ha = @(a,b,e) Haa(a) + Hab1(b) + Hab2(b) + Hae(e);
 Hb = @(a,b,e) Hbb(b) + Hba1(a) + Hba2(a) + Hbe(e);
@@ -119,17 +127,18 @@ H = @(X,a,b,e) Ha(a,b,e)*(X==1) + Hb(a,b,e)*(X==-1) + He(a,b,e)*(X==0);
 rng('default');
 rand(3);
 N = 20*4;
-% 0.7 + 0.2/N*x % this line make the probabilty after 80 test to be 0.7 of more
-P = @(x) exp( log(0.7 + 0.25/N/2*x) /N );
-
+% 0.7 + 0.2/N*x % this line make the probabilty after N/2 test to be 0.7 of more
+P = @(x) exp( log(0.7 + 0.25/N/2*x) /(N/2) );
 
 
 [II,JJ] = meshgrid(1:Size);
 
 numOfA = zeros(1,N);
+numOfE = zeros(1,N);
 distance_to_prev = zeros(1,N);
 distance_to_start = zeros(1,N);
 f_start = f;
+f_history = ones(size(f));
 count = 0;
 count2 = 0;
 
@@ -137,10 +146,12 @@ for n = 1:N
     RandIndex = randperm(Size^2);
     f_prev = f;
     
+    
 for kk = RandIndex
     ii = II(kk);
     jj = JJ(kk);
     
+    f_original = 1*A(ii,jj)+(-1)*B(ii,jj);
     f_site = f(ii,jj);
     
     % check nn - nearest neighborhoods
@@ -149,49 +160,49 @@ for kk = RandIndex
     b = sum(nn == -1);
     e = sum(nn == 0);
     
-    Ea = (tanh(Ha(a,b,e))+1)./2;
-    Eb = (tanh(Hb(a,b,e))+1)./2;
-    Ee = (tanh(He(a,b,e))+1)./2;
+    % different sigmoind function that make probabilty from x in (-Inf,Inf)
+    % Option 1: not good because it decay too fast
+    % Ea = (tanh(Ha(a,b,e))+1)./2;
+    % Eb = (tanh(Hb(a,b,e))+1)./2;
+    % Ee = (tanh(He(a,b,e))+1)./2;
     
+    % Option 2: decay fine
+    Ea = (atan(Ha(a,b,e))+pi./2)./pi;
+    Eb = (atan(Hb(a,b,e))+pi./2)./pi;
+    Ee = (atan(He(a,b,e))+pi./2)./pi;
+    %     [Ea Eb Ee]
     
     if f_site == 1 % f_site == A
-        Pa = P(n);
-        Pb = (1-Pa)*Eb./(Eb+Ee);
-        Pe = (1-Pa)*Ee./(Eb+Ee);
+        if f_original == 1 || f_history(ii,jj) > 8
+            Pa = P(n);
+            Pb = (1-Pa)*Eb./(Eb+Ee);
+            Pe = (1-Pa)*Ee./(Eb+Ee);
+        else
+            Pa = P(0);
+            Pb = (1-Pa)*Eb./(Eb+Ee);
+            Pe = (1-Pa)*Ee./(Eb+Ee);
+        end
     elseif f_site == -1 % f_site == B
-        Pb = P(n);
-        Pa = (1-Pb)*Ea./(Ea+Ee);
-        Pe = (1-Pb)*Ee./(Ea+Ee);
+        if f_original == 1 || f_history(ii,jj) > 8
+            Pb = P(n);
+            Pa = (1-Pb)*Ea./(Ea+Ee);
+            Pe = (1-Pb)*Ee./(Ea+Ee);
+        else
+            Pb = P(0);
+            Pa = (1-Pb)*Ea./(Ea+Ee);
+            Pe = (1-Pb)*Ee./(Ea+Ee);
+        end
     elseif f_site == 0 % f_site == E
-        Pe = P(n);
-        Pa = (1-Pe)*Ea./(Eb+Ea);
-        Pb = (1-Pe)*Eb./(Eb+Ea);
+        if f_original == 1 || f_history(ii,jj) > 8
+            Pe = 0.9*P(n);
+            Pa = (1-Pe)*Ea./(Eb+Ea);
+            Pb = (1-Pe)*Eb./(Eb+Ea);
+        else
+            Pe = 0.9*P(0);
+            Pa = (1-Pe)*Ea./(Eb+Ea);
+            Pb = (1-Pe)*Eb./(Eb+Ea);
+        end
     end
-%     Ea = (tanh(Ha(a,b,e))+1)./2;
-%     Eb = (tanh(Hb(a,b,e))+1)./2;
-%     Ee = (tanh(He(a,b,e))+1)./2;
-%     
-%     Ea = (atan(Ha(a,b,e))+pi./2)./pi;
-%     Eb = (atan(Hb(a,b,e))+pi./2)./pi;
-%     Ee = (atan(He(a,b,e))+pi./2)./pi;
-%     
-%     E = [Eb Ee Ea];
-%     I = f_site+2;
-%     I_Logic = false(1,3);
-%     I_Logic(I) = true;
-%     E(~I_Logic) = 0;
-%     
-%     self_factor = 300;
-%     Etot = self_factor*E(I) + sum([Eb Ee Ea]);
-%     
-%     Ea = (Ea+self_factor*E(3))./Etot;
-%     Eb = (Eb+self_factor*E(1))./Etot;
-%     Ee = 0*(Ee+self_factor*E(2))./Etot;
-% 
-%     Etot = Ea + Eb + Ee;
-%     Ea = Ea./Etot;
-%     Eb = Eb./Etot;
-%     Ee = Ee./Etot;
 
     [~,I] = max([Pb Pe Pa]);
     I = I-2;
@@ -210,17 +221,26 @@ for kk = RandIndex
             f(ii,jj) = -1;
         end
     end
+    if f_site == f(ii,jj)
+        f_history(ii,jj) = f_history(ii,jj) + 1;
+    else
+        f_history(ii,jj) = 1;
+    end
+        
 end
+all_f(:,:,n+1) = f;
 
 if mod(n,10) == 0
     figure;
     imagesc(f)
     colorbar
+    title(n)
 end
 
 numOfA(n) = sum(sum(f==1));
 distance_to_prev(n) = sum(sum(f~=f_prev));
 distance_to_start(n) = sum(sum(f~=f_start));
+numOfE(n) = sum(sum(f == 0));
 end
 %%
 figure;
@@ -234,11 +254,12 @@ plot(distance_to_start)
 title('distance from start f')
 count
 count2
+numOfE = sum(numOfE)
 distance_to_start(N)./Size.^2
 
 %%
-%
-num = get(gcf,'Number');
+num = floor(N/10)+4;
+% num = get(gcf,'Number');
 for ii = num:-1:1
     figure(ii)
 end
@@ -248,3 +269,16 @@ for ii = num-2:num
 end
     
 %}
+
+%% show all fields
+
+for ii = 1:size(all_f,3)
+    figure(102);
+    imagesc(all_f(:,:,ii))
+    title(ii)
+    colorbar;
+    
+    pause(0.1)
+    
+end
+% makeMyGif(all_f, 'testAnimated2.gif',0.05);
