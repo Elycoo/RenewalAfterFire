@@ -12,35 +12,52 @@ clear
 % clc
 close all
 
+%% List of all the parameter in the simulation
+Size = 20; % Size of square grid.
+N = 80; % The number of itaraion until stop
+p1 = 1; % parameter that interupt the growing.
+p2 = 2; % parameter that make growing.
+beta = 0.5; % beta smaller -> more changes in field
 
-A = [0.2760    0.4984    0.7513    0.9593    0.8407;
-     0.6797    0.9597    0.2551    0.5472    0.2543;
-     0.6551    0.3404    0.5060    0.1386    0.8143;
-     0.1626    0.5853    0.6991    0.1493    0.2435;
-     0.1190    0.2238    0.8909    0.2575    0.9293];
-% A reresent the probabilty of each point in matrix to grow an A tree.
 
-B = [0.3500    0.3517    0.2858    0.0759    0.1299;
-     0.1966    0.8308    0.7572    0.0540    0.5688;
-     0.2511    0.5853    0.7537    0.5308    0.4694;
-     0.6160    0.5497    0.3804    0.7792    0.0119;
-     0.4733    0.9172    0.5678    0.9340    0.3371];
-% B reresent the probabilty of each point in matrix to grow an B tree.
- 
-E = [0.1622    0.6020    0.4505    0.8258    0.1067;
-    0.7943    0.2630    0.0838    0.5383    0.9619;
-    0.3112    0.6541    0.2290    0.9961    0.0046;
-    0.5285    0.6892    0.9133    0.0782    0.7749;
-    0.1656    0.7482    0.1524    0.4427    0.8173];
-% E reresent the probabilty of each point in matrix to extinction.
-Size = 20;
+% % the shape of the potential is determine by these lines
+A_shape = [4 2 0];
+B_shape = [0 2 4];
+E_shape = [4 0 4];
+depth_of_shape = 1.25;
+depth_of_shape_for_E = 1;
+iter_to_be_stat = 25;
+% for example:
+% E = (depth_of_shape + f_hist/iter_to_be_stat)*A_shape;
+
+% if f_original == 1 % == A
+%     E = (1.25+1*(-0.25+f_history(ii,jj))/10)*[4 2 0]; % energy cost for [B E A]
+%     E_start = E;
+%     E = E + [Eb Ee Ea];
+% elseif f_original == -1 % == B
+%     E = (1.25+1*(-0.25+f_history(ii,jj))/10)*[0 2 4]; % energy cost for [B E A]
+%     E_start = E;
+%     E = E + [Eb Ee Ea];
+% elseif f_original == 0 % == e
+%     E = 1*[4 0 4]; % energy cost for [B E A]
+%     E_start = E;
+%     E = E + [Eb Ee Ea];
+% end
+
+
+
+%%
+
+% A represent the probabilty of each point in matrix to grow an A tree.
+% B represent the probabilty of each point in matrix to grow an B tree.
+% E represent the probabilty of each point in matrix to extinction.
+% Size = 20;
 rng('default');
+% rand(Size);
 rand(Size);
 A = rand(Size);
 B = rand(Size);
-E = 0*rand(Size);
-
-% A = 3*ones(Size);
+E = 0.3*rand(Size);
 
 % nomalize probabilty:
 S = A+B+E;
@@ -57,7 +74,7 @@ f = f-2;
 A = f==1;
 B = f==-1;
 
-all_f = zeros(Size,Size,81,'int8');
+all_f = zeros(Size,Size,N+1,'int8');
 all_f(:,:,1) = f;
 
 figure;
@@ -75,61 +92,19 @@ colorbar
 % gives somebenefits to other planets and surpress his kinds of plants.
 
 % First we'll try to consider just nearest neighborhoods.
-% n stand for the number of neighborhoods
-n = 4;
 
-% define arbitrary parameters
-aa = 1;
-bb = 1;
-ee = 0;
-
-ab1 = 1;
-ab2 = 0;
-ba1 = 1;
-ba2 = 0;
-
-ae = 1;
-be = 1;
-
-ea = -1;
-eb = -1;
-
-% A-A and B-B interaction
-Haa = @(x) -aa*x.*(x-n);
-Hbb = @(x) -bb*x.*(x-n);
-Hee = @(x) 0;
-
-% A-B inteaction
-Hab1 = @(x) ab2*n/2;
-Hab2 = @(x) ab2*n/2;
-Hba1 = @(x) ba2*n/2;
-Hba2 = @(x) ba2*n/2;
-
-% A-E and A-B interaction. How A/B effected from E that around
-Hae = @(x) ae*x;
-Hbe = @(x) be*x;
-
-% E-A and B-E interaction. How E effected from A/B that around
-Hea = @(x) ea*x;
-Heb = @(x) ea*x;
-
-Ha = @(a,b,e) Haa(a) + Hab1(b) + Hab2(b) + Hae(e);
-Hb = @(a,b,e) Hbb(b) + Hba1(a) + Hba2(a) + Hbe(e);
-He = @(a,b,e) Hee(e) + Hea(a) + Heb(b);
-
-H = @(X,a,b,e) Ha(a,b,e)*(X==1) + Hb(a,b,e)*(X==-1) + He(a,b,e)*(X==0);
-
-
-
+% different energies
+% p1 = 1; % parameter that interupt the growing.
+% p2 = 2; % parameter that make growing.
+Ha = @(a,b,e) (a+b)*p1 - a*p2; 
+Hb = @(a,b,e) (a+b)*p1 - b*p2;
+He = @(a,b,e) -(a+b)*p1 + (a+b)*p2;
 %% Monte-Carlo
 % N is the number of the iteration for our model we choose period of 20
 % years and we assumed that nothing chages in less then a season.
 rng('default');
 rand(3);
-N = 20*4;
-% 0.7 + 0.2/N*x % this line make the probabilty after N/2 test to be 0.7 of more
-P = @(x) exp( log(0.7 + 0.25/N/2*x) /(N/2) );
-
+% N = 20*4;
 
 [II,JJ] = meshgrid(1:Size);
 
@@ -137,6 +112,7 @@ numOfA = zeros(1,N);
 numOfE = zeros(1,N);
 distance_to_prev = zeros(1,N);
 distance_to_start = zeros(1,N);
+distance_to_all_f2 = zeros(1,N);
 f_start = f;
 f_history = ones(size(f));
 count = 0;
@@ -160,73 +136,48 @@ for kk = RandIndex
     b = sum(nn == -1);
     e = sum(nn == 0);
     
-    % different sigmoind function that make probabilty from x in (-Inf,Inf)
-    % Option 1: not good because it decay too fast
-    % Ea = (tanh(Ha(a,b,e))+1)./2;
-    % Eb = (tanh(Hb(a,b,e))+1)./2;
-    % Ee = (tanh(He(a,b,e))+1)./2;
+    Ea = Ha(a,b,e);
+    Eb = Hb(a,b,e);
+    Ee = He(a,b,e);
     
-    % Option 2: decay fine
-    Ea = (atan(Ha(a,b,e))+pi./2)./pi;
-    Eb = (atan(Hb(a,b,e))+pi./2)./pi;
-    Ee = (atan(He(a,b,e))+pi./2)./pi;
-    %     [Ea Eb Ee]
-    
-    if f_site == 1 % f_site == A
-        if f_original == 1 || f_history(ii,jj) > 8
-            Pa = P(n);
-            Pb = (1-Pa)*Eb./(Eb+Ee);
-            Pe = (1-Pa)*Ee./(Eb+Ee);
-        else
-            Pa = P(0);
-            Pb = (1-Pa)*Eb./(Eb+Ee);
-            Pe = (1-Pa)*Ee./(Eb+Ee);
-        end
-    elseif f_site == -1 % f_site == B
-        if f_original == 1 || f_history(ii,jj) > 8
-            Pb = P(n);
-            Pa = (1-Pb)*Ea./(Ea+Ee);
-            Pe = (1-Pb)*Ee./(Ea+Ee);
-        else
-            Pb = P(0);
-            Pa = (1-Pb)*Ea./(Ea+Ee);
-            Pe = (1-Pb)*Ee./(Ea+Ee);
-        end
-    elseif f_site == 0 % f_site == E
-        if f_original == 1 || f_history(ii,jj) > 8
-            Pe = 0.9*P(n);
-            Pa = (1-Pe)*Ea./(Eb+Ea);
-            Pb = (1-Pe)*Eb./(Eb+Ea);
-        else
-            Pe = 0.9*P(0);
-            Pa = (1-Pe)*Ea./(Eb+Ea);
-            Pb = (1-Pe)*Eb./(Eb+Ea);
-        end
+    f_hist = f_history(ii,jj);
+    if f_original == 1 % == A
+        E_start = (depth_of_shape + f_hist/iter_to_be_stat)*A_shape; % energy cost for [B E A]
+    elseif f_original == -1 % == B    
+        E_start = (depth_of_shape + f_hist/iter_to_be_stat)*B_shape; % energy cost for [B E A]
+    elseif f_original == 0 % == e    
+        E_start = depth_of_shape_for_E*E_shape; % energy cost for [B E A]
     end
-
-    [~,I] = max([Pb Pe Pa]);
-    I = I-2;
+    E = E_start + [Eb Ee Ea];
     
-    if I ~= f_site
-        f(ii,jj) = I;
-        count = count + 1;
+    
+%     f_site = 0;
+    I = [-1 0 1];
+    I(I==f_site) = [];
+    deltaE = E(I+2) - E(f_site+2);
+    if any(deltaE<0)
+        [~,inx] = min(deltaE);
+        f(ii,jj) = I(inx);
     else
-        count2 = count2 + 1;
+%         beta = 0.5; % beta smaller -> more changes in field
+        P = exp(-beta*deltaE);
+        P = P./(sum(P)+1); % +1 for the state itself deltaE = 0;
         r = rand(1);
-        if r < Pa
-            f(ii,jj) = 1;
-        elseif r < Pa + Pe
-            f(ii,jj) = 0;
+        if r < P(1)
+            f(ii,jj) = I(1);
+        elseif r < P(2)
+            f(ii,jj) = I(2);
         else
-            f(ii,jj) = -1;
+            f(ii,jj) = f(ii,jj);
         end
     end
+    
     if f_site == f(ii,jj)
         f_history(ii,jj) = f_history(ii,jj) + 1;
     else
         f_history(ii,jj) = 1;
     end
-        
+
 end
 all_f(:,:,n+1) = f;
 
@@ -240,6 +191,7 @@ end
 numOfA(n) = sum(sum(f==1));
 distance_to_prev(n) = sum(sum(f~=f_prev));
 distance_to_start(n) = sum(sum(f~=f_start));
+distance_to_all_f2(n) = sum(sum(f~=all_f(:,:,2)));
 numOfE(n) = sum(sum(f == 0));
 end
 %%
@@ -256,6 +208,7 @@ count
 count2
 numOfE = sum(numOfE)
 distance_to_start(N)./Size.^2
+distance_to_all_f2(N)./Size.^2
 
 %%
 num = floor(N/10)+4;
@@ -273,12 +226,11 @@ end
 %% show all fields
 
 for ii = 1:size(all_f,3)
-    figure(102);
-    imagesc(all_f(:,:,ii))
-    title(ii)
-    colorbar;
-    
-    pause(0.1)
+%     figure(102);
+%     title(ii)
+%     imagesc(all_f(:,:,ii))
+%     colorbar;
+%     pause(0.1)
     
 end
-% makeMyGif(all_f, 'testAnimated2.gif',0.05);
+% makeMyGif(all_f, 'testAnimated3.gif',0.05);
