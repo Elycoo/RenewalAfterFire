@@ -57,3 +57,16 @@ set(gca,'FontSize',20)
 % legend('Energy level of states','Initial Energy level of states','Current state','Delta in energies','Location','Best')
 legend('Energy level of states','Current state','Delta in energies','Location','Best')
 
+%% regular field in new color
+map = [[120/255   222/255   0];
+       [0.9769    0.9839    0.0805];
+       [0.2422    0.1504    0.6603]];
+title('')
+axis square
+set(gca,'YDir','normal')
+colormap(map)
+colorbar('Ticks',[-2/3,0,2/3],...
+         'TickLabels',{'B','E','A'})
+set(gca,'FontSize',20)
+xticks([])
+yticks([])
